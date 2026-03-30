@@ -1666,6 +1666,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;ba
     <div class="fr"><span class="fl">Titre / légende</span>
       <input type="text" id="dtg-titre" placeholder="ex: Hall d'entrée, état général" style="flex:1;border:none;background:transparent;font-size:14px;text-align:right;outline:none;padding:10px 0;font-family:inherit">
     </div>
+            <div class="fr"><span class="fl">Bâtiment n°</span><select id="dtg-bat" style="flex:1;border:none;background:transparent;font-size:14px;color:var(--acc);text-align:right;outline:none;-webkit-appearance:none"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select></div>
     <div style="padding:10px 14px;border-top:.5px solid var(--bor)">
       <div style="font-size:11px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Tags qualification</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
@@ -4747,21 +4748,6 @@ function toggleCollAcc(id){
 loadCopro();
 loadVMC();
 renderApptsList();
-renderCoproRecap();
-renderDTG();
-updateHeader();
-updateExportView();
-renderAccueil();
-st();
-renderCoproRecap();
-renderDTG();
-updateHeader();
-updateExportView();
-renderAccueil();
-r();
-updateExportView();
-renderAccueil();
-st();
 renderCoproRecap();
 renderDTG();
 updateHeader();
