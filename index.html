@@ -2086,7 +2086,7 @@ function creerAppt(){
     niveau:  document.getElementById('apt-niveau').value,
     pos:     document.getElementById('apt-pos').value,
     surf:    document.getElementById('apt-surf').value,
-    occupant:document.getElementById('apt-occupant').value.trim(),
+    bat:     document.getElementById('apt-bat').value,       occupant:document.getElementById('apt-occupant').value.trim(),
     hsp:     document.getElementById('apt-hsp').value,
     chantier:copro.nom||'',
     date:    new Date().toLocaleString('fr-FR')
@@ -3925,7 +3925,7 @@ function validerPhotosDTG(){
     dtgPhotos.push({
       id: Date.now()+Math.random(),
       cat,
-      titre: titre || (cat+(n>1?' '+(i+1):'')),
+      titre: titre || (cat+(n>1?' '+(i+1):'')),       bat: document.getElementById('dtg-bat').value.trim(),
       tags,
       src,
       date: new Date().toLocaleString('fr-FR')
@@ -4002,7 +4002,7 @@ function renderDTG(){
         return '<div style="position:relative;border-radius:var(--rs);overflow:hidden;border:.5px solid var(--bor);background:var(--sur)">'
           +'<img src="'+p.src+'" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">'
           +'<div style="padding:4px 6px">'
-            +'<div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+p.titre+'">'+p.titre+'</div>'
+            +document.g'<div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+p.titre+'">'+p.titre+'</div>'+(p.bat?'<div style="font-size:10px;font-weight:700;color:var(--eti-dark);background:var(--eti-xlight);padding:1px 6px;border-radius:4px;display:inline-block;margin-top:2px">Bât. '+p.bat+'</div>':'')etElementById('dtg-titre').value='';   document.getElementById('dtg-bat').value='';   resetDTGTags();
             +(tagBadges?'<div style="margin-top:3px;display:flex;flex-wrap:wrap">'+tagBadges+'</div>':'')
           +'</div>'
           +'<button data-id="'+sid+'" onclick="suppPhotoDTG(this.dataset.id)" style="position:absolute;top:4px;right:4px;background:rgba(163,45,45,.85);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:22px;text-align:center;padding:0">×</button>'
@@ -4068,7 +4068,7 @@ async function exportDTGZip(){
   for(let i=0; i<sorted.length; i++){
     const p = sorted[i];
     const num = String(i+1).padStart(2,'0');
-    const filename = num+'_'+slug(p.cat)+'_'+slug(p.titre||p.cat)+'.png';
+    const batSlug = p.bat ? 'Bat'+slug(p.bat)+'_' : '';     const filename = num+'_'+batSlug+slug(p.cat)+'_'+slug(p.titre||p.cat)+'.png';
 
     if(prog) prog.textContent = 'Conversion '+num+'/'+sorted.length+'…';
 
