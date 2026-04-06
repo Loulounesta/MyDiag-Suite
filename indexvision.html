@@ -14,32 +14,24 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; touch-action: none; }
         body { background: var(--bg); color: var(--tx); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* HEADER */
         header { background: #1E293B; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
         .logo { font-weight: 900; font-size: 18px; color: var(--acc); display: flex; align-items: center; gap: 8px; }
         .logo span { font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; color: white; }
 
-        /* ZONE DE TRAVAIL */
         #main-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
         canvas { max-width: 100%; max-height: 100%; display: none; cursor: crosshair; }
         
         #drop-zone { text-align: center; padding: 40px; border: 2px dashed #334155; border-radius: 20px; cursor: pointer; }
-        #drop-zone:hover { border-color: var(--acc); background: rgba(59, 130, 246, 0.05); }
-
-        /* INTERFACE DE GUIDAGE */
         #info-bar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.85); padding: 10px 20px; border-radius: 30px; border: 1px solid var(--acc); font-size: 13px; font-weight: 600; z-index: 10; display: none; backdrop-filter: blur(5px); pointer-events: none; }
         
-        /* CONTROLES */
         .controls { background: #1E293B; padding: 15px; display: flex; gap: 10px; border-top: 1px solid #334155; overflow-x: auto; }
         .btn { padding: 12px 18px; border-radius: 10px; border: none; font-weight: 800; cursor: pointer; transition: 0.2s; font-size: 13px; white-space: nowrap; }
         .btn-p { background: var(--acc); color: white; }
         .btn-s { background: #334155; color: white; }
         .btn-ok { background: var(--ok); color: white; }
 
-        /* RÉSULTATS */
         #results-panel { position: fixed; right: 20px; top: 80px; width: 220px; background: rgba(30, 41, 59, 0.95); border-radius: 15px; padding: 15px; border: 1px solid #334155; display: none; max-height: 50vh; overflow-y: auto; z-index: 100; }
         .res-item { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; margin-bottom: 5px; font-size: 11px; display: flex; justify-content: space-between; border-left: 3px solid var(--ok); }
-
         #loader { position: fixed; bottom: 90px; right: 20px; background: var(--ok); color: white; padding: 10px 20px; border-radius: 10px; font-size: 12px; font-weight: 800; display: none; z-index: 1000; }
     </style>
 </head>
@@ -47,44 +39,38 @@
 
 <header>
     <div class="logo">MYDIAG VISION <span>v1.1</span></div>
-    <div id="status" style="font-size: 12px; font-weight: bold; color: #64748b;">Moteur IA : Chargement...</div>
+    <div id="status" style="font-size: 12px; color: #64748b;">Moteur IA : Chargement...</div>
 </header>
 
 <div id="main-container">
     <div id="drop-zone" onclick="document.getElementById('file-input').click()">
         <div style="font-size: 40px; margin-bottom: 15px;">🖼️</div>
         <h3>Importer un plan</h3>
-        <p style="color: #64748b; margin-top: 8px; font-size: 14px;">Photo ou Capture d'écran (JPG/PNG)</p>
+        <p style="color: #64748b; margin-top: 8px; font-size: 14px;">Photo ou Capture (JPG/PNG)</p>
     </div>
     <canvas id="canvas-vision" onclick="handleCanvasClick(event)"></canvas>
-    <div id="info-bar">Étape 1 : Cliquez sur 2 points pour définir l'échelle</div>
+    <div id="info-bar">Étape 1 : Cliquez sur 2 points (Échelle)</div>
 </div>
 
 <div id="results-panel">
-    <h4 style="margin-bottom:10px; font-size:11px; color:var(--acc); letter-spacing: 1px;">MURS SÉLECTIONNÉS</h4>
+    <h4 style="margin-bottom:10px; font-size:11px; color:var(--acc);">MURS DÉTECTÉS</h4>
     <div id="list-murs"></div>
 </div>
 
 <div class="controls" id="controls" style="display:none;">
     <button class="btn btn-s" onclick="location.reload()">🔄 Reset</button>
     <div style="flex:1;"></div>
-    <button id="btn-process" class="btn btn-p" onclick="processPlan()" style="display:none;">Lancer Détection IA</button>
-    <button id="btn-transfer" class="btn btn-ok" onclick="transferToDPE()" style="display:none;">🚀 Envoyer vers MyDiag-DPE</button>
+    <button id="btn-process" class="btn btn-p" onclick="processPlan()" style="display:none;">Lancer IA</button>
+    <button id="btn-transfer" class="btn btn-ok" onclick="transferToDPE()" style="display:none;">🚀 Envoyer vers DPE</button>
 </div>
 
-<div id="loader">Analyse OpenCV en cours...</div>
+<div id="loader">Analyse OpenCV...</div>
 <input type="file" id="file-input" style="display:none;" accept="image/*">
 
 <script>
     let cvLoaded = false;
-    let state = {
-        img: null, canvas: null, ctx: null,
-        step: 'idle', // idle | calibration | selection
-        points: [], ratio: 1, scaleUI: 1,
-        lines: []
-    };
+    let state = { img: null, canvas: null, ctx: null, step: 'idle', points: [], ratio: 1, scaleUI: 1, lines: [] };
 
-    // 1. Chargement asynchrone d'OpenCV
     function loadOpenCV() {
         let script = document.createElement('script');
         script.src = 'https://docs.opencv.org/4.5.0/opencv.js';
@@ -98,7 +84,6 @@
     }
     loadOpenCV();
 
-    // 2. Gestion de l'importation
     document.getElementById('file-input').onchange = (e) => {
         const file = e.target.files[0];
         if(!file) return;
@@ -110,16 +95,15 @@
                 state.canvas = document.getElementById('canvas-vision');
                 state.ctx = state.canvas.getContext('2d');
                 state.step = 'calibration';
-                state.points = [];
-                state.lines = [];
-                
                 document.getElementById('drop-zone').style.display = 'none';
                 state.canvas.style.display = 'block';
                 document.getElementById('info-bar').style.display = 'block';
                 document.getElementById('controls').style.display = 'flex';
                 document.getElementById('results-panel').style.display = 'block';
-                
-                resizeCanvas();
+                const container = document.getElementById('main-container');
+                state.scaleUI = Math.min(container.clientWidth / img.width, container.clientHeight / img.height);
+                state.canvas.width = img.width * state.scaleUI;
+                state.canvas.height = img.height * state.scaleUI;
                 draw();
             };
             img.src = ev.target.result;
@@ -127,15 +111,6 @@
         reader.readAsDataURL(file);
     };
 
-    function resizeCanvas() {
-        const container = document.getElementById('main-container');
-        const ratio = Math.min(container.clientWidth / state.img.width, container.clientHeight / state.img.height);
-        state.canvas.width = state.img.width * ratio;
-        state.canvas.height = state.img.height * ratio;
-        state.scaleUI = ratio;
-    }
-
-    // 3. Interaction
     function handleCanvasClick(e) {
         if(state.step === 'idle') return;
         const rect = state.canvas.getBoundingClientRect();
@@ -145,43 +120,35 @@
         if(state.step === 'calibration') {
             state.points.push({x, y});
             if(state.points.length === 2) {
-                let dist = prompt("Distance réelle entre ces points (m) ?", "0.90");
+                let dist = prompt("Distance réelle (m) ?", "0.90");
                 if(dist) {
                     let pxDist = Math.hypot(state.points[1].x - state.points[0].x, state.points[1].y - state.points[0].y) / state.scaleUI;
                     state.ratio = parseFloat(dist) / pxDist;
                     document.getElementById('btn-process').style.display = 'block';
-                    document.getElementById('info-bar').textContent = "Échelle définie. Lancez la détection.";
+                    document.getElementById('info-bar').textContent = "Échelle OK. Lancez l'IA.";
                 } else { state.points = []; }
             }
         } else if (state.step === 'selection') {
             state.lines.forEach(l => {
-                if(distToSegment({x: x/state.scaleUI, y: y/state.scaleUI}, l) < 15) {
-                    l.selected = !l.selected;
-                }
+                if(distToSegment({x: x/state.scaleUI, y: y/state.scaleUI}, l) < 15) l.selected = !l.selected;
             });
             updateResults();
         }
         draw();
     }
 
-    // 4. Moteur de Détection
     function processPlan() {
-        if(!cvLoaded) return alert("IA en cours de chargement...");
         document.getElementById('loader').style.display = 'block';
         state.step = 'selection';
         document.getElementById('btn-process').style.display = 'none';
-        document.getElementById('info-bar').textContent = "Étape 2 : Cliquez sur les murs détectés (vert = conservé)";
-
         setTimeout(() => {
             let src = cv.imread(state.img);
             let dst = new cv.Mat();
             cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
             cv.adaptiveThreshold(src, src, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
             cv.Canny(src, dst, 50, 150, 3);
-            
             let lines = new cv.Mat();
             cv.HoughLinesP(dst, lines, 1, Math.PI / 180, 30, 40, 15);
-            
             state.lines = [];
             for (let i = 0; i < lines.rows; ++i) {
                 let x1 = lines.data32S[i * 4], y1 = lines.data32S[i * 4 + 1], x2 = lines.data32S[i * 4 + 2], y2 = lines.data32S[i * 4 + 3];
@@ -195,7 +162,37 @@
         }, 100);
     }
 
-    // 5. Rendu & Transfert
     function draw() {
-        if(!state.img) return;
-        state.ctx.drawImage(state.img, 0, 0, state.canvas.width, state.canvas
+        state.ctx.drawImage(state.img, 0, 0, state.canvas.width, state.canvas.height);
+        state.ctx.fillStyle = "#EF4444";
+        state.points.forEach(p => { state.ctx.beginPath(); state.ctx.arc(p.x, p.y, 6, 0, Math.PI*2); state.ctx.fill(); });
+        state.lines.forEach(l => {
+            state.ctx.strokeStyle = l.selected ? "#10B981" : "rgba(59, 130, 246, 0.4)";
+            state.ctx.lineWidth = l.selected ? 5 : 2;
+            state.ctx.beginPath(); state.ctx.moveTo(l.x1 * state.scaleUI, l.y1 * state.scaleUI);
+            state.ctx.lineTo(l.x2 * state.scaleUI, l.y2 * state.scaleUI); state.ctx.stroke();
+        });
+    }
+
+    function updateResults() {
+        const selected = state.lines.filter(l => l.selected);
+        document.getElementById('list-murs').innerHTML = selected.map((l, i) => `<div class="res-item"><span>#${i+1}</span><strong>${l.length}m</strong></div>`).join('');
+    }
+
+    async function transferToDPE() {
+        const selected = state.lines.filter(l => l.selected);
+        if(selected.length === 0) return alert("Sélectionnez des murs !");
+        const data = selected.map(l => ({ l: l.length, ori: Math.abs(l.x2 - l.x1) > Math.abs(l.y2 - l.y1) ? "Nord" : "Est" }));
+        await localforage.setItem('vision_transfer_bridge', data);
+        alert(`${selected.length} murs envoyés !`);
+    }
+
+    function distToSegment(p, s) {
+        let l2 = Math.pow(s.x2-s.x1, 2) + Math.pow(s.y2-s.y1, 2);
+        if (l2 == 0) return Math.hypot(p.x-s.x1, p.y-s.y1);
+        let t = Math.max(0, Math.min(1, ((p.x - s.x1) * (s.x2 - s.x1) + (p.y - s.y1) * (s.y2 - s.y1)) / l2));
+        return Math.hypot(p.x - (s.x1 + t * (s.x2 - s.x1)), p.y - (s.y1 + t * (s.y2 - s.y1)));
+    }
+</script>
+</body>
+</html>
