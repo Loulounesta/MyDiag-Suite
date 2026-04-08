@@ -3,196 +3,289 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MyDiag Vision - Extracteur de Plan</title>
+    <title>MyDiag PRO - Stable Final</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         :root {
-            --bg: #0F172A; --sur: #1E293B; --acc: #3B82F6; --ok: #10B981; --dan: #EF4444; --tx: #F8FAFC;
+            --bg: #F8FAFC; --sur: #FFFFFF; --bor: #E2E8F0; --tx: #0F172A; --tx2: #64748B;
+            --acc: #2563EB; --ok: #16A34A; --dan: #EF4444; --warn: #F59E0B; --r: 12px;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; touch-action: none; }
-        body { background: var(--bg); color: var(--tx); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        * { box-sizing: border-box; margin: 0; padding: 0; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--tx); padding-bottom: 100px; }
 
-        header { background: #1E293B; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
-        .logo { font-weight: 900; font-size: 18px; color: var(--acc); display: flex; align-items: center; gap: 8px; }
-        .logo span { font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; color: white; }
+        /* Navigation */
+        .hd { background: #0F172A; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; color: white; }
+        .tabs { background: #0F172A; display: flex; overflow-x: auto; padding: 0 15px 10px; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .tab { padding: 8px 16px; font-size: 12px; font-weight: 600; color: #94A3B8; border-radius: 20px; cursor: pointer; white-space: nowrap; background: rgba(255,255,255,0.05); }
+        .tab.on { color: #fff; background: var(--acc); }
 
-        #main-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
-        canvas { max-width: 100%; max-height: 100%; display: none; cursor: crosshair; }
+        /* Views */
+        .vw { display: none; padding: 16px; max-width: 700px; margin: 0 auto; animation: fadeIn 0.2s ease-out; }
+        .vw.on { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Cards */
+        .card { background: var(--sur); border-radius: var(--r); border: 1px solid var(--bor); margin-bottom: 16px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .fr { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--bor); }
+        .fl { font-size: 13px; color: var(--tx2); width: 120px; font-weight: 600; }
+        input, select { flex: 1; border: 1px solid var(--bor); padding: 8px 12px; border-radius: 8px; font-size: 14px; color: var(--acc); font-weight: 700; text-align: right; outline: none; background: #F8FAFC; }
         
-        #drop-zone { text-align: center; padding: 40px; border: 2px dashed #334155; border-radius: 20px; cursor: pointer; }
-        #info-bar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.85); padding: 10px 20px; border-radius: 30px; border: 1px solid var(--acc); font-size: 13px; font-weight: 600; z-index: 10; display: none; backdrop-filter: blur(5px); pointer-events: none; }
-        
-        .controls { background: #1E293B; padding: 15px; display: flex; gap: 10px; border-top: 1px solid #334155; overflow-x: auto; }
-        .btn { padding: 12px 18px; border-radius: 10px; border: none; font-weight: 800; cursor: pointer; transition: 0.2s; font-size: 13px; white-space: nowrap; }
-        .btn-p { background: var(--acc); color: white; }
-        .btn-s { background: #334155; color: white; }
-        .btn-ok { background: var(--ok); color: white; }
+        .btn-p { background: var(--acc); color: #fff; padding: 14px; border-radius: 10px; border: none; font-size: 14px; font-weight: 700; width: 100%; cursor: pointer; }
+        .btn-s { background: white; border: 1px solid var(--bor); padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
-        #results-panel { position: fixed; right: 20px; top: 80px; width: 220px; background: rgba(30, 41, 59, 0.95); border-radius: 15px; padding: 15px; border: 1px solid #334155; display: none; max-height: 50vh; overflow-y: auto; z-index: 100; }
-        .res-item { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; margin-bottom: 5px; font-size: 11px; display: flex; justify-content: space-between; border-left: 3px solid var(--ok); }
-        #loader { position: fixed; bottom: 90px; right: 20px; background: var(--ok); color: white; padding: 10px 20px; border-radius: 10px; font-size: 12px; font-weight: 800; display: none; z-index: 1000; }
+        /* Lists */
+        .item-row { background: white; padding: 12px; border-radius: 10px; border: 1px solid var(--bor); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--bor); }
+        
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0F172A; color: white; padding: 12px 24px; border-radius: 25px; font-size: 13px; opacity: 0; transition: 0.3s; z-index: 1000; }
+        .toast.show { opacity: 1; }
     </style>
 </head>
 <body>
 
-<header>
-    <div class="logo">MYDIAG VISION <span>v1.1</span></div>
-    <div id="status" style="font-size: 12px; color: #64748b;">Moteur IA : Chargement...</div>
-</header>
+<div class="hd">
+    <div style="font-weight: 900;">MyDiag <span style="color:var(--acc)">PRO</span> <small style="font-size:9px; opacity:0.5;">v8.13.3</small></div>
+    <button class="btn-s" style="background:transparent; color:white; border-color:rgba(255,255,255,0.2)" onclick="saveDB()">Sauver</button>
+</div>
 
-<div id="main-container">
-    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-        <div style="font-size: 40px; margin-bottom: 15px;">🖼️</div>
-        <h3>Importer un plan</h3>
-        <p style="color: #64748b; margin-top: 8px; font-size: 14px;">Photo ou Capture (JPG/PNG)</p>
+<div class="tabs">
+    <div class="tab on" onclick="goTab('copro')">🏢 Copro / ADN</div>
+    <div class="tab" onclick="goTab('lots')">🚪 Lots</div>
+    <div class="tab" onclick="goTab('murs')">🧱 Parois</div>
+    <div class="tab" onclick="goTab('lucarnes')">📐 Lucarnes</div>
+    <div class="tab" onclick="goTab('export')">📤 Export</div>
+</div>
+
+<div id="vw-copro" class="vw on">
+    <div class="card">
+        <div class="fr"><span class="fl">Nom Copro</span><input type="text" id="c-nom" oninput="updateCopro()"></div>
+        <div class="fr"><span class="fl">Chauffage Col.</span><select id="c-chauf" onchange="updateCopro()"><option value="Individuel">Individuel</option><option value="Gaz Collectif">Gaz Collectif</option><option value="Fioul Collectif">Fioul Collectif</option><option value="Réseau Urbain">Réseau Urbain</option></select></div>
+        <div class="fr"><span class="fl">ECS Col.</span><select id="c-ecs" onchange="updateCopro()"><option value="Individuel">Individuel</option><option value="Collectif">Production Collective</option></select></div>
     </div>
-    <canvas id="canvas-vision" onclick="handleCanvasClick(event)"></canvas>
-    <div id="info-bar">Étape 1 : Cliquez sur 2 points (Échelle)</div>
+    <div style="font-size: 11px; color: var(--tx2); padding: 0 10px;">* Ces données ADN seront automatiquement rattachées aux lots sans système propre.</div>
 </div>
 
-<div id="results-panel">
-    <h4 style="margin-bottom:10px; font-size:11px; color:var(--acc);">MURS DÉTECTÉS</h4>
-    <div id="list-murs"></div>
+<div id="vw-lots" class="vw">
+    <div class="card" style="padding: 15px;">
+        <input type="text" id="l-num" placeholder="Numéro du lot (ex: E01)" style="width:100%; text-align:left; margin-bottom:10px;">
+        <input type="number" id="l-surf" placeholder="Surface m²" style="width:100%; text-align:left;">
+        <button class="btn-p" style="margin-top:10px;" onclick="addLot()">+ Ajouter l'échantillon</button>
+    </div>
+    <div id="list-lots"></div>
 </div>
 
-<div class="controls" id="controls" style="display:none;">
-    <button class="btn btn-s" onclick="location.reload()">🔄 Reset</button>
-    <div style="flex:1;"></div>
-    <button id="btn-process" class="btn btn-p" onclick="processPlan()" style="display:none;">Lancer IA</button>
-    <button id="btn-transfer" class="btn btn-ok" onclick="transferToDPE()" style="display:none;">🚀 Envoyer vers DPE</button>
+<div id="vw-murs" class="vw">
+    <select id="m-target" class="card" style="width:100%; padding: 12px; margin-bottom: 15px;" onchange="curApt=this.value; renderMurs()"></select>
+    
+    <div class="card">
+        <div class="fr"><span class="fl">Orientation</span><select id="m-ori"><option>Nord</option><option>Est</option><option>Sud</option><option>Ouest</option></select></div>
+        <div class="fr"><span class="fl">Longueur (m)</span><input type="number" step="0.01" id="m-len"></div>
+        <div class="fr"><span class="fl">Hauteur (m)</span><input type="number" step="0.01" id="m-hei" value="2.50"></div>
+        <div class="fr">
+            <span class="fl">Photo Paroi</span>
+            <input type="file" id="m-file" style="display:none;" accept="image/*" onchange="handleImg(this)">
+            <button class="btn-s" onclick="document.getElementById('m-file').click()">📷 Prendre/Joindre</button>
+            <img id="m-prev" class="thumb" style="margin-left:auto; display:none;">
+        </div>
+    </div>
+    <button class="btn-p" onclick="addMur()">Enregistrer le mur</button>
+    <div id="list-murs" style="margin-top: 15px;"></div>
 </div>
 
-<div id="loader">Analyse OpenCV...</div>
-<input type="file" id="file-input" style="display:none;" accept="image/*">
+<div id="vw-lucarnes" class="vw">
+    <div class="card" style="padding: 20px; background: var(--acc-l); border: 1px dashed var(--acc);">
+        <h4 style="margin-bottom: 10px; color: var(--acc);">Jouées de Lucarnes (Triangle)</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div><label style="font-size:10px; font-weight:800;">Base (m)</label><input type="number" id="luc-b" placeholder="0.00" oninput="calcLuc()"></div>
+            <div><label style="font-size:10px; font-weight:800;">Hauteur (m)</label><input type="number" id="luc-h" placeholder="0.00" oninput="calcLuc()"></div>
+        </div>
+        <div id="luc-res" style="text-align: center; font-weight: 800; font-size: 14px;">Surface (2 jouées) : 0.00 m²</div>
+        <button class="btn-p" style="margin-top: 15px;" onclick="applyLuc()">+ Injecter au lot sélectionné</button>
+    </div>
+</div>
+
+<div id="vw-export" class="vw">
+    <div class="card" style="padding: 20px; text-align: center;">
+        <button class="btn-p" style="background: var(--ok);" onclick="exportExcel()">📊 EXPORT EXCEL (Mapping ADN)</button>
+        <button class="btn-p" style="background: #475569; margin-top: 10px;" onclick="exportZip()">📸 EXPORT PHOTOS (ZIP)</button>
+        <button class="btn-s" style="margin-top: 30px; width: 100%; color: var(--dan);" onclick="clearAll()">🗑️ Supprimer tout le projet</button>
+    </div>
+</div>
+
+<div id="toast" class="toast">Action effectuée</div>
 
 <script>
-    let cvLoaded = false;
-    let state = { img: null, canvas: null, ctx: null, step: 'idle', points: [], ratio: 1, scaleUI: 1, lines: [] };
+    let db = { copro: {}, appts: [], murs: [] };
+    let curApt = null;
+    let tempImg = null;
 
-    function loadOpenCV() {
-        let script = document.createElement('script');
-        script.src = 'https://docs.opencv.org/4.5.0/opencv.js';
-        script.async = true;
-        script.onload = () => {
-            cvLoaded = true;
-            document.getElementById('status').textContent = 'Moteur IA : PRÊT ✅';
-            document.getElementById('status').style.color = '#10B981';
-        };
-        document.body.appendChild(script);
+    // --- NAVIGATION ---
+    function goTab(id) {
+        document.querySelectorAll('.vw').forEach(v => v.classList.remove('on'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+        document.getElementById('vw-' + id).classList.add('on');
+        event.target.classList.add('on');
+        if(id === 'murs') populateSelect();
     }
-    loadOpenCV();
 
-    document.getElementById('file-input').onchange = (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const img = new Image();
-            img.onload = () => {
-                state.img = img;
-                state.canvas = document.getElementById('canvas-vision');
-                state.ctx = state.canvas.getContext('2d');
-                state.step = 'calibration';
-                document.getElementById('drop-zone').style.display = 'none';
-                state.canvas.style.display = 'block';
-                document.getElementById('info-bar').style.display = 'block';
-                document.getElementById('controls').style.display = 'flex';
-                document.getElementById('results-panel').style.display = 'block';
-                const container = document.getElementById('main-container');
-                state.scaleUI = Math.min(container.clientWidth / img.width, container.clientHeight / img.height);
-                state.canvas.width = img.width * state.scaleUI;
-                state.canvas.height = img.height * state.scaleUI;
-                draw();
-            };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
-    };
+    // --- DB MANAGEMENT & ADN ---
+    async function saveDB() {
+        await localforage.setItem('mydiag_v8_stable', db);
+        showToast("Sauvegardé ✓");
+    }
 
-    function handleCanvasClick(e) {
-        if(state.step === 'idle') return;
-        const rect = state.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        if(state.step === 'calibration') {
-            state.points.push({x, y});
-            if(state.points.length === 2) {
-                let dist = prompt("Distance réelle (m) ?", "0.90");
-                if(dist) {
-                    let pxDist = Math.hypot(state.points[1].x - state.points[0].x, state.points[1].y - state.points[0].y) / state.scaleUI;
-                    state.ratio = parseFloat(dist) / pxDist;
-                    document.getElementById('btn-process').style.display = 'block';
-                    document.getElementById('info-bar').textContent = "Échelle OK. Lancez l'IA.";
-                } else { state.points = []; }
-            }
-        } else if (state.step === 'selection') {
-            state.lines.forEach(l => {
-                if(distToSegment({x: x/state.scaleUI, y: y/state.scaleUI}, l) < 15) l.selected = !l.selected;
-            });
-            updateResults();
+    async function loadDB() {
+        const saved = await localforage.getItem('mydiag_v8_stable');
+        if(saved) {
+            db = saved;
+            document.getElementById('c-nom').value = db.copro.nom || "";
+            document.getElementById('c-chauf').value = db.copro.chauf || "Individuel";
+            document.getElementById('c-ecs').value = db.copro.ecs || "Individuel";
+            renderLots();
         }
-        draw();
     }
 
-    function processPlan() {
-        document.getElementById('loader').style.display = 'block';
-        state.step = 'selection';
-        document.getElementById('btn-process').style.display = 'none';
-        setTimeout(() => {
-            let src = cv.imread(state.img);
-            let dst = new cv.Mat();
-            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
-            cv.adaptiveThreshold(src, src, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
-            cv.Canny(src, dst, 50, 150, 3);
-            let lines = new cv.Mat();
-            cv.HoughLinesP(dst, lines, 1, Math.PI / 180, 30, 40, 15);
-            state.lines = [];
-            for (let i = 0; i < lines.rows; ++i) {
-                let x1 = lines.data32S[i * 4], y1 = lines.data32S[i * 4 + 1], x2 = lines.data32S[i * 4 + 2], y2 = lines.data32S[i * 4 + 3];
-                let len = Math.hypot(x2-x1, y2-y1) * state.ratio;
-                if(len > 0.15) state.lines.push({x1, y1, x2, y2, length: len.toFixed(2), selected: false});
-            }
-            src.delete(); dst.delete(); lines.delete();
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('btn-transfer').style.display = 'block';
-            draw();
-        }, 100);
+    function updateCopro() {
+        db.copro = {
+            nom: document.getElementById('c-nom').value,
+            chauf: document.getElementById('c-chauf').value,
+            ecs: document.getElementById('c-ecs').value
+        };
     }
 
-    function draw() {
-        state.ctx.drawImage(state.img, 0, 0, state.canvas.width, state.canvas.height);
-        state.ctx.fillStyle = "#EF4444";
-        state.points.forEach(p => { state.ctx.beginPath(); state.ctx.arc(p.x, p.y, 6, 0, Math.PI*2); state.ctx.fill(); });
-        state.lines.forEach(l => {
-            state.ctx.strokeStyle = l.selected ? "#10B981" : "rgba(59, 130, 246, 0.4)";
-            state.ctx.lineWidth = l.selected ? 5 : 2;
-            state.ctx.beginPath(); state.ctx.moveTo(l.x1 * state.scaleUI, l.y1 * state.scaleUI);
-            state.ctx.lineTo(l.x2 * state.scaleUI, l.y2 * state.scaleUI); state.ctx.stroke();
+    // --- LOTS ---
+    function addLot() {
+        const num = document.getElementById('l-num').value;
+        const surf = document.getElementById('l-surf').value;
+        if(!num || !surf) return alert("Saisie vide");
+        db.appts.push({ id: Date.now(), num, surf });
+        saveDB(); renderLots();
+    }
+
+    function renderLots() {
+        document.getElementById('list-lots').innerHTML = db.appts.map(a => `
+            <div class="item-row">
+                <span><b>Lot ${a.num}</b> — ${a.surf}m²</span>
+                <button onclick="delLot(${a.id})" style="color:var(--dan); border:none; background:none; font-weight:800;">X</button>
+            </div>
+        `).join('');
+    }
+
+    function delLot(id) {
+        if(confirm("Supprimer le lot et ses parois ?")) {
+            db.appts = db.appts.filter(a => a.id !== id);
+            db.murs = db.murs.filter(m => m.aid !== id);
+            saveDB(); renderLots();
+        }
+    }
+
+    // --- PAROIS & PHOTOS ---
+    function handleImg(input) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            tempImg = e.target.result;
+            document.getElementById('m-prev').src = tempImg;
+            document.getElementById('m-prev').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+
+    function addMur() {
+        if(!curApt) return alert("Sélectionnez un lot !");
+        db.murs.push({
+            id: Date.now(), aid: curApt,
+            ori: document.getElementById('m-ori').value,
+            len: document.getElementById('m-len').value,
+            hei: document.getElementById('m-hei').value,
+            img: tempImg
         });
+        tempImg = null;
+        document.getElementById('m-prev').style.display = 'none';
+        saveDB(); renderMurs();
     }
 
-    function updateResults() {
-        const selected = state.lines.filter(l => l.selected);
-        document.getElementById('list-murs').innerHTML = selected.map((l, i) => `<div class="res-item"><span>#${i+1}</span><strong>${l.length}m</strong></div>`).join('');
+    function renderMurs() {
+        const filtrés = db.murs.filter(m => m.aid == curApt);
+        document.getElementById('list-murs').innerHTML = filtrés.map(m => `
+            <div class="item-row">
+                <div><span class="badge">${m.ori}</span> <b>${m.len}m</b> x ${m.hei}m</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    ${m.img ? `<img src="${m.img}" class="thumb">` : ''}
+                    <button onclick="db.murs=db.murs.filter(x=>x.id!==${m.id}); renderMurs();" style="color:var(--dan); border:none; background:none;">🗑️</button>
+                </div>
+            </div>
+        `).join('');
     }
 
-    async function transferToDPE() {
-        const selected = state.lines.filter(l => l.selected);
-        if(selected.length === 0) return alert("Sélectionnez des murs !");
-        const data = selected.map(l => ({ l: l.length, ori: Math.abs(l.x2 - l.x1) > Math.abs(l.y2 - l.y1) ? "Nord" : "Est" }));
-        await localforage.setItem('vision_transfer_bridge', data);
-        alert(`${selected.length} murs envoyés !`);
+    // --- LUCARNES ---
+    function calcLuc() {
+        const b = parseFloat(document.getElementById('luc-b').value) || 0;
+        const h = parseFloat(document.getElementById('luc-h').value) || 0;
+        const total = (b * h); // (Base*H)/2 * 2 jouées = Rectangle
+        document.getElementById('luc-res').textContent = `Surface (2 jouées) : ${total.toFixed(2)} m²`;
     }
 
-    function distToSegment(p, s) {
-        let l2 = Math.pow(s.x2-s.x1, 2) + Math.pow(s.y2-s.y1, 2);
-        if (l2 == 0) return Math.hypot(p.x-s.x1, p.y-s.y1);
-        let t = Math.max(0, Math.min(1, ((p.x - s.x1) * (s.x2 - s.x1) + (p.y - s.y1) * (s.y2 - s.y1)) / l2));
-        return Math.hypot(p.x - (s.x1 + t * (s.x2 - s.x1)), p.y - (s.y1 + t * (s.y2 - s.y1)));
+    function applyLuc() {
+        if(!curApt) return alert("Lot?");
+        const surf = (parseFloat(document.getElementById('luc-b').value) * parseFloat(document.getElementById('luc-h').value));
+        db.murs.push({ id: Date.now(), aid: curApt, ori: "Jouées Lucarne", len: surf, hei: 1 });
+        saveDB(); showToast("Jouées ajoutées ✓");
     }
+
+    // --- EXPORTS LISIBLES ---
+    function exportExcel() {
+        const wb = XLSX.utils.book_new();
+        
+        // Mapping ADN : On enrichit les murs avec les données copro au vol
+        const dataExport = db.murs.map(m => {
+            const lot = db.appts.find(a => a.id == m.aid);
+            return {
+                "Référence": db.copro.nom,
+                "Numéro Lot": lot ? lot.num : "Inconnu",
+                "Orientation": m.ori,
+                "Longueur": m.len,
+                "Hauteur": m.hei,
+                "Surface Paroi": (parseFloat(m.len) * parseFloat(m.hei)).toFixed(2),
+                "ADN Chauffage": db.copro.chauf,
+                "ADN ECS": db.copro.ecs
+            };
+        });
+
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataExport), "Diagnostic_Synthese");
+        XLSX.writeFile(wb, `MyDiag_DPE_${db.copro.nom || 'Export'}.xlsx`);
+    }
+
+    async function exportZip() {
+        const zip = new JSZip();
+        db.murs.forEach(m => {
+            if(m.img) {
+                const b64 = m.img.split(',')[1];
+                const lotNum = db.appts.find(a => a.id == m.aid).num;
+                zip.file(`Lot_${lotNum}_${m.ori}_${m.id}.png`, b64, {base64: true});
+            }
+        });
+        const content = await zip.generateAsync({type:"blob"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(content);
+        a.download = "Photos_DPE.zip";
+        a.click();
+    }
+
+    // --- UTILS ---
+    function populateSelect() {
+        let h = '<option value="">-- Choisir Lot Cible --</option>';
+        db.appts.forEach(a => h += `<option value="${a.id}" ${curApt == a.id ? 'selected':''}>Lot ${a.num}</option>`);
+        document.getElementById('m-target').innerHTML = h;
+    }
+    function showToast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+    function clearAll() { if(confirm("Tout effacer ?")) { localforage.clear(); location.reload(); } }
+
+    window.onload = loadDB;
 </script>
+
 </body>
 </html>
