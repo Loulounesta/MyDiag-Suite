@@ -352,12 +352,19 @@
 <div id="sys-toast" class="toast">Action effectuée ✓</div>
 
 <script>
-        let db = {copro:{}, appts:[], murs:[], fens:[], portes:[], plfs:[], plas:[]};
+        // --- VARIABLES & BASE DE DONNÉES COMPLÈTE ---
+    let db = {copro:{}, docs:[], vmc:{}, chaufCol:{}, ecsCol:{}, appts:[], chaufs:[], ecss:[], murs:[], fens:[], modelesFens:[], portes:[], plfs:[], plas:[]};
+    let tempPhotos = { chauf: {}, ecs: {} }; 
+    let expAppts = {};
     let curAppt = null; 
+    let curNivInt = 0; 
+    let editParoiId = null;
+    let currentUploadTarget = null;
     let lastCalc = {};
 
     function genId() { return String(Date.now()) + '_' + Math.random().toString(36).substr(2, 6); }
-    
+    function escHtml(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
+
     function toast(msg) {
         let el = document.getElementById('sys-toast');
         if(!el) return; el.textContent = msg; el.classList.add('show');
@@ -372,6 +379,7 @@
         } catch (err) { toast('⚠️ Erreur de sauvegarde'); }
     }
 
+    // --- MISE À JOUR DE L'INTERFACE ---
     function updateDashboard() {
         let nameEl = document.getElementById('acc-copro-name'); if(nameEl) nameEl.textContent = db.copro.nom || "Aucune copropriété saisie";
         let tdbAppts = document.getElementById('tdb-appts'); if(tdbAppts) tdbAppts.textContent = db.appts.length;
@@ -388,6 +396,15 @@
             ville: document.getElementById('copro-ville').value, annee: document.getElementById('copro-annee').value, 
             batiments: document.getElementById('copro-batiments').value, etages: document.getElementById('copro-etages').value
         };
+        const vmcType = document.getElementById('vmc-type'); const vmcPer  = document.getElementById('vmc-periode');
+        if (vmcType || vmcPer) db.vmc = { type: vmcType ? vmcType.value : '', periode: vmcPer ? vmcPer.value : '' };
+        
+        const cEn = document.getElementById('col-chauf-energie'); const cGe = document.getElementById('col-chauf-gen'); const cEm = document.getElementById('col-chauf-emetteur'); const cAn = document.getElementById('col-chauf-annee'); const cPu = document.getElementById('col-chauf-puissance');
+        if (cEn) db.chaufCol = { ...db.chaufCol, energie: cEn.value, gen: cGe.value, emetteur: cEm.value, annee: cAn.value, puissance: cPu.value };
+        
+        const eEn = document.getElementById('col-ecs-energie'); const eTy = document.getElementById('col-ecs-type'); const eAn = document.getElementById('col-ecs-annee'); const eVo = document.getElementById('col-ecs-vol');
+        if (eEn) db.ecsCol = { ...db.ecsCol, energie: eEn.value, type: eTy.value, annee: eAn.value, vol: eVo.value };
+        
         updateDashboard(); sauvegarderLocal();
     }
 
@@ -407,9 +424,58 @@
         if(arrow) arrow.textContent = body.classList.contains('open') ? '▼' : '▶'; 
     }
 
+    // --- UPLOAD PHOTOS ET DOCUMENTS ---
+    function triggerUpload(type, id = null) { currentUploadTarget = { type, id }; document.getElementById('global-uploader').click(); }
+    document.getElementById('global-uploader').onchange = function(e) {
+        const file = e.target.files[0]; if(!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas'); const MAX_DIM = 1024;
+                let w = img.width, h = img.height; let scale = Math.min(MAX_DIM/w, MAX_DIM/h);
+                if(scale < 1) { w = Math.round(w * scale); h = Math.round(h * scale); }
+                canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                const b64 = canvas.toDataURL('image/jpeg', 0.82); saveFileToTarget({ name: file.name, data: b64 });
+            }; img.src = ev.target.result;
+        }; reader.readAsDataURL(file); e.target.value = '';
+    };
+
+    function saveFileToTarget(f) {
+        const t = currentUploadTarget;
+        if(t.type === 'doc') { db.docs.push({ id: genId(), name: f.name, type: 'img', data: f.data }); renderDocs(); } 
+        else if (t.type === 'chaufCol') { db.chaufCol.photo = f.data; renderCoproPhotos(); }
+        else if (t.type === 'ecsCol') { db.ecsCol.photo = f.data; renderCoproPhotos(); }
+        sauvegarderLocal(); toast("Photo ajoutée !");
+    }
+
+    function renderDocs() {
+        let el = document.getElementById('list-docs'); if(!el) return;
+        el.innerHTML = db.docs.map(d => `
+            <div class="item-row" style="align-items:center;">
+                <img src="${d.data}" class="thumb" onclick="viewImage(this.src)">
+                <div style="flex:1; margin-left:12px; font-size:12px; font-weight:bold;">${escHtml(d.name)}</div>
+                <button class="btn-xs" style="color:red;" onclick="db.docs=db.docs.filter(x=>String(x.id)!=='${d.id}'); renderDocs(); sauvegarderLocal();">X</button>
+            </div>`).join('');
+    }
+
+    function renderCoproPhotos() {
+        const iChauf = document.getElementById('img-chaufCol');
+        if(iChauf && db.chaufCol && db.chaufCol.photo) { iChauf.src = db.chaufCol.photo; iChauf.style.display = 'block'; }
+        const iEcs = document.getElementById('img-ecsCol');
+        if(iEcs && db.ecsCol && db.ecsCol.photo) { iEcs.src = db.ecsCol.photo; iEcs.style.display = 'block'; }
+    }
+
+    function viewImage(src) {
+        document.getElementById('img-viewer-src').src = src;
+        document.getElementById('img-viewer').style.display = 'flex';
+    }
+
     // --- CRÉATION DE LOT EN MODAL FLOTTANT (ZÉRO BLOCAGE) ---
     function showNouvelAppt() {
-        document.getElementById('modal-new-apt').style.display = 'flex';
+        let modal = document.getElementById('modal-new-apt');
+        if(!modal) return goTab('appts'); // Fallback de sécurité
+        modal.style.display = 'flex';
         let numSel = document.getElementById('apt-num'); numSel.innerHTML = '';
         for(let i=1; i<=30; i++) { let num = "E" + (i<10?"0"+i:i); numSel.innerHTML += `<option value="${num}">${num}</option>`; }
         updateBatimentOptions('apt-bat'); updateEtageOptions('apt-etage');
@@ -435,7 +501,7 @@
 
     function creerAppt() {
         let num = document.getElementById('apt-num').value;
-        let surf = document.getElementById('apt-surf').value || "0"; // Si vide, on met 0 au lieu de bloquer
+        let surf = document.getElementById('apt-surf').value || "0"; 
         
         let apt = {
             id: genId(), num: num, type: document.getElementById('apt-type').value,
@@ -448,19 +514,14 @@
         hideNouvelAppt(); 
         toast("Lot " + num + " créé !");
         
-        sauvegarderLocal(); 
-        renderApptsList(); 
-        updateDashboard(); 
-        peuplerTargets(); 
+        sauvegarderLocal(); renderApptsList(); updateDashboard(); peuplerTargets(); 
         
         let activeTab = document.querySelector('.vw.on').id.replace('vw-', '');
         if(['murs','fen','portes','plafonds','planchers'].includes(activeTab)) { renderElementsList(activeTab); }
     }
 
     function fastNav(aptId, tabName) {
-        curAppt = aptId;
-        peuplerTargets();
-        goTab(tabName);
+        curAppt = aptId; peuplerTargets(); goTab(tabName);
     }
 
     function renderApptsList() {
@@ -505,11 +566,7 @@
 
     // --- GESTION DES PAROIS (ZÉRO BLOCAGE) ---
     function sauverParoi(type) {
-        if(!curAppt) {
-            // Si le technicien essaie d'ajouter un mur alors qu'aucun lot n'existe, on affiche la fenêtre de création de lot !
-            toast("⚠️ Créons d'abord le lot !");
-            return showNouvelAppt();
-        }
+        if(!curAppt) { toast("⚠️ Créons d'abord le lot !"); return showNouvelAppt(); }
         
         let el = { id: genId(), aid: curAppt };
         
@@ -518,7 +575,6 @@
             el.mat = document.getElementById('m-mat').value; el.ep = document.getElementById('m-ep').value;
             el.l = document.getElementById('m-l').value; el.h = document.getElementById('m-h').value;
             db.murs.push(el);
-            // On vide les champs L et H pour la saisie suivante
             document.getElementById('m-l').value = ''; document.getElementById('m-h').value = '';
         } else if(type === 'fens') {
             el.ori = document.getElementById('f-ori').value; el.type = document.getElementById('f-type').value;
@@ -556,12 +612,10 @@
         
         let el = document.getElementById(listId); if(!el) return; let html = '';
         arr.forEach(x => {
-            // Affichage intelligent si la dimension manque
             let desc = "<span style='color:#F59E0B;'>À compléter</span>";
             if (x.l && x.h) desc = `${x.l}x${x.h}`;
             else if (x.s) desc = `${x.s}m²`;
             else if (x.l && x.larg) desc = `${x.l}x${x.larg}`;
-
             if(x.mat) desc += ` - ${x.mat}`;
             
             html += `<div class="item-row" style="align-items:center;">
@@ -663,7 +717,11 @@
         ['copro-ref','copro-nom','copro-adresse','copro-cp','copro-ville','copro-annee','copro-batiments','copro-etages'].forEach(id => {
             let k = id.replace('copro-',''); let el = document.getElementById(id); if (el && db.copro[k]) el.value = db.copro[k];
         });
-        peuplerSelects(); renderApptsList(); peuplerTargets(); updateDashboard();
+        const vmcType = document.getElementById('vmc-type'); const vmcPer  = document.getElementById('vmc-periode');
+        if (vmcType && db.vmc && db.vmc.type) vmcType.value = db.vmc.type;
+        if (vmcPer && db.vmc && db.vmc.periode) vmcPer.value = db.vmc.periode;
+        
+        peuplerSelects(); renderApptsList(); peuplerTargets(); updateDashboard(); renderDocs(); renderCoproPhotos();
     };
 
 </script>
