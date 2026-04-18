@@ -352,7 +352,7 @@
 <div id="sys-toast" class="toast">Action effectuée ✓</div>
 
 <script>
-    let db = {copro:{}, appts:[], murs:[], fens:[], portes:[], plfs:[], plas:[]};
+        let db = {copro:{}, appts:[], murs:[], fens:[], portes:[], plfs:[], plas:[]};
     let curAppt = null; 
     let lastCalc = {};
 
@@ -407,7 +407,7 @@
         if(arrow) arrow.textContent = body.classList.contains('open') ? '▼' : '▶'; 
     }
 
-    // --- CRÉATION DE LOT EN "MODAL" FLOTTANT (La grande nouveauté) ---
+    // --- CRÉATION DE LOT EN MODAL FLOTTANT (ZÉRO BLOCAGE) ---
     function showNouvelAppt() {
         document.getElementById('modal-new-apt').style.display = 'flex';
         let numSel = document.getElementById('apt-num'); numSel.innerHTML = '';
@@ -435,8 +435,7 @@
 
     function creerAppt() {
         let num = document.getElementById('apt-num').value;
-        let surf = document.getElementById('apt-surf').value;
-        if(!num || !surf) { toast("N° échantillon et surface requis !"); return; }
+        let surf = document.getElementById('apt-surf').value || "0"; // Si vide, on met 0 au lieu de bloquer
         
         let apt = {
             id: genId(), num: num, type: document.getElementById('apt-type').value,
@@ -444,7 +443,7 @@
             niveau: document.getElementById('apt-niveau').value, surf: surf, hsp: document.getElementById('apt-hsp').value || '2.50'
         };
         db.appts.push(apt);
-        curAppt = apt.id; // Le nouveau lot devient automatiquement le lot ciblé
+        curAppt = apt.id; 
         
         hideNouvelAppt(); 
         toast("Lot " + num + " créé !");
@@ -454,12 +453,10 @@
         updateDashboard(); 
         peuplerTargets(); 
         
-        // Rafraichit la liste des éléments de l'onglet actif (si on l'a créé depuis "Murs", la liste des murs se vide car nouveau lot)
         let activeTab = document.querySelector('.vw.on').id.replace('vw-', '');
         if(['murs','fen','portes','plafonds','planchers'].includes(activeTab)) { renderElementsList(activeTab); }
     }
 
-    // --- NAVIGATION TRANSVERSALE DEPUIS LA LISTE DES LOTS ---
     function fastNav(aptId, tabName) {
         curAppt = aptId;
         peuplerTargets();
@@ -470,10 +467,9 @@
         let lbl = document.getElementById('appts-count-lbl'); if(lbl) lbl.innerText = db.appts.length + (db.appts.length > 1 ? ' lots' : ' lot');
         let html = '';
         db.appts.forEach(a => {
-            // Ajout des boutons de navigation transversale
             html += `<div class="item-row" style="flex-direction:column; align-items:stretch;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <div><div style="font-weight:900; color:var(--acc);">Lot ${a.num}</div><div style="font-size:12px; color:var(--tx2);">${a.surf} m²</div></div>
+                    <div><div style="font-weight:900; color:var(--acc);">Lot ${a.num}</div><div style="font-size:12px; color:var(--tx2);">${a.surf > 0 ? a.surf + ' m²' : 'Surface à compléter'}</div></div>
                     <button class="btn-xs" style="background:#FEE2E2; color:#EF4444;" onclick="supprimerAppt('${a.id}')">Supprimer</button>
                 </div>
                 <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; border-top:1px dashed var(--bor); padding-top:10px;">
@@ -498,7 +494,7 @@
 
     function peuplerTargets() {
         let html = '<option value="">-- Choisir un lot --</option>';
-        db.appts.forEach(a => { html += `<option value="${a.id}">Lot ${a.num} (${a.surf}m²)</option>`; });
+        db.appts.forEach(a => { html += `<option value="${a.id}">Lot ${a.num}</option>`; });
         ['murs-target', 'fen-target', 'por-target', 'plf-target', 'pla-target'].forEach(id => {
             let el = document.getElementById(id); if(el) { el.innerHTML = html; if(curAppt) el.value = curAppt; }
         });
@@ -507,33 +503,44 @@
     function verifierAptActif(tab) { if(!curAppt && db.appts.length > 0) { curAppt = db.appts[0].id; peuplerTargets(); } }
     function changeTargetApt(val, tab) { curAppt = val; peuplerTargets(); renderElementsList(tab); }
 
-    // --- GESTION DES PAROIS ---
+    // --- GESTION DES PAROIS (ZÉRO BLOCAGE) ---
     function sauverParoi(type) {
-        if(!curAppt) return toast("⚠️ Créez ou sélectionnez un lot !");
+        if(!curAppt) {
+            // Si le technicien essaie d'ajouter un mur alors qu'aucun lot n'existe, on affiche la fenêtre de création de lot !
+            toast("⚠️ Créons d'abord le lot !");
+            return showNouvelAppt();
+        }
+        
         let el = { id: genId(), aid: curAppt };
         
         if(type === 'murs') {
             el.ori = document.getElementById('m-ori').value; el.donne = document.getElementById('m-donne').value;
             el.mat = document.getElementById('m-mat').value; el.ep = document.getElementById('m-ep').value;
             el.l = document.getElementById('m-l').value; el.h = document.getElementById('m-h').value;
-            if(!el.l || !el.h) return toast("Saisissez L et H"); db.murs.push(el);
+            db.murs.push(el);
+            // On vide les champs L et H pour la saisie suivante
+            document.getElementById('m-l').value = ''; document.getElementById('m-h').value = '';
         } else if(type === 'fens') {
             el.ori = document.getElementById('f-ori').value; el.type = document.getElementById('f-type').value;
             el.mat = document.getElementById('f-mat').value; el.vit = document.getElementById('f-vit').value;
             el.l = document.getElementById('f-l').value; el.h = document.getElementById('f-h').value;
-            if(!el.l || !el.h) return toast("Saisissez L et H"); db.fens.push(el);
+            db.fens.push(el);
+            document.getElementById('f-l').value = ''; document.getElementById('f-h').value = '';
         } else if(type === 'portes') {
             el.type = document.getElementById('po-type').value; el.mat = document.getElementById('po-mat').value;
             el.l = document.getElementById('po-l').value; el.h = document.getElementById('po-h').value;
-            if(!el.l || !el.h) return toast("Saisissez L et H"); db.portes.push(el);
+            db.portes.push(el);
+            document.getElementById('po-l').value = ''; document.getElementById('po-h').value = '';
         } else if(type === 'plfs') {
             el.type = document.getElementById('p-type').value; el.donne = document.getElementById('p-donne').value;
             el.l = document.getElementById('p-l').value; el.larg = document.getElementById('p-larg').value; el.s = document.getElementById('p-s').value;
-            if(!el.s && (!el.l || !el.larg)) return toast("Saisissez la surface ou L et larg"); db.plfs.push(el);
+            db.plfs.push(el);
+            document.getElementById('p-l').value = ''; document.getElementById('p-larg').value = ''; document.getElementById('p-s').value = '';
         } else if(type === 'plas') {
             el.type = document.getElementById('s-type').value; el.donne = document.getElementById('s-donne').value;
             el.l = document.getElementById('s-l').value; el.larg = document.getElementById('s-larg').value; el.s = document.getElementById('s-s').value;
-            if(!el.s && (!el.l || !el.larg)) return toast("Saisissez la surface ou L et larg"); db.plas.push(el);
+            db.plas.push(el);
+            document.getElementById('s-l').value = ''; document.getElementById('s-larg').value = ''; document.getElementById('s-s').value = '';
         }
 
         toast("Enregistré !"); sauvegarderLocal(); renderElementsList(type);
@@ -549,8 +556,14 @@
         
         let el = document.getElementById(listId); if(!el) return; let html = '';
         arr.forEach(x => {
-            let desc = (x.l && x.h) ? `${x.l}x${x.h}` : (x.s ? x.s+'m²' : `${x.l}x${x.larg}`);
+            // Affichage intelligent si la dimension manque
+            let desc = "<span style='color:#F59E0B;'>À compléter</span>";
+            if (x.l && x.h) desc = `${x.l}x${x.h}`;
+            else if (x.s) desc = `${x.s}m²`;
+            else if (x.l && x.larg) desc = `${x.l}x${x.larg}`;
+
             if(x.mat) desc += ` - ${x.mat}`;
+            
             html += `<div class="item-row" style="align-items:center;">
                 <div style="font-size:13px; font-weight:700;">${desc}</div>
                 <button class="btn-xs" style="background:#FEE2E2; color:#EF4444;" onclick="supprimerElement('${type}', '${x.id}')">X</button>
@@ -652,6 +665,7 @@
         });
         peuplerSelects(); renderApptsList(); peuplerTargets(); updateDashboard();
     };
+
 </script>
 
 </body>
